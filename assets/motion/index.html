@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P4 신선식품 수요 예측 및 스마트 발주 최적화 · 30초 Motion Effect</title>
+<style>
+:root{
+  --navy:#1F3A5F; --blue:#2E86C1; --teal:#17A2B8; --red:#E74C3C; --orange:#F39C12;
+  --green:#1E9E6A; --ink:#1B2B40; --mute:#5B6B80; --line:#D5DEE8;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:#0C1829;color:#fff;
+  font-family:Pretendard,'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-serif}
+button{font:inherit;color:inherit}
+#app{display:flex;flex-direction:column;height:100%}
+#viewport{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#frame{position:relative;flex:none}
+#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;
+  background:linear-gradient(180deg,#FFFFFF 0%,#EEF3F8 100%);color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* 스테이지 내부 */
+#hdr{position:absolute;left:0;top:0;width:1920px;height:88px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 64px;border-bottom:2px solid var(--line);background:rgba(255,255,255,.9);z-index:5}
+#hdr .brand{display:flex;align-items:center;gap:18px;font-size:28px;font-weight:700;color:var(--navy)}
+#hdr .mark{width:46px;height:46px;border-radius:12px;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800}
+#hdr .right{display:flex;align-items:center;gap:20px;font-size:26px;color:var(--mute);font-weight:600}
+#phase{padding:6px 22px;border-radius:999px;font-weight:800;font-size:24px}
+#phase.problem{background:#FDEDEC;color:#C0392B}
+#phase.solution{background:#E3F0FA;color:#1F6FA6}
+#scenes{position:absolute;left:0;top:0;width:1920px;height:1080px}
+.scene{position:absolute;left:0;top:0;width:1920px;height:1080px;display:none}
+.a{position:absolute;transform-origin:50% 50%;opacity:0}
+#sub{position:absolute;left:80px;right:80px;bottom:44px;height:136px;z-index:6;display:flex;align-items:center;justify-content:center;
+  background:rgba(20,36,62,.82);border-radius:16px;padding:0 64px;text-align:center}
+#subText{font-size:30px;line-height:1.5;color:#fff;font-weight:500;word-break:keep-all}
+#veil{position:absolute;inset:0;z-index:7;background:rgba(240,245,250,.78);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;cursor:pointer}
+#veil .vt{font-size:60px;font-weight:800;color:var(--navy);letter-spacing:-.02em;text-align:center;line-height:1.25}
+#veil .vs{font-size:32px;color:var(--mute);font-weight:600}
+#veil .play{width:150px;height:150px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 30px rgba(31,58,95,.35)}
+#veil .play svg{width:64px;height:64px;margin-left:8px}
+#veil.hidden{display:none}
+
+/* 컨트롤 바 */
+#bar{flex:none;background:#12243D;border-top:1px solid #243A5A;padding:10px 20px 12px;display:flex;flex-direction:column;gap:8px}
+.row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+#progress{position:relative;flex:1;min-width:200px;height:26px;cursor:pointer;display:flex;align-items:center}
+#track{position:relative;width:100%;height:10px;border-radius:5px;background:#2A4166;overflow:hidden}
+#fill{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,#17A2B8,#2E86C1)}
+.tick{position:absolute;top:2px;bottom:2px;width:2px;background:#12243D;pointer-events:none}
+#progress .phasebar{position:absolute;left:0;top:-2px;height:3px;width:66.666%;background:#E74C3C;opacity:.0}
+#time{font-size:15px;color:#B8C7DB;min-width:110px;text-align:right}
+.btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border:1px solid #35527D;border-radius:10px;background:#1B3558;color:#EAF1F9;font-size:15px;font-weight:600;cursor:pointer}
+.btn:hover:not(:disabled){background:#24457A}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.primary{background:#2E86C1;border-color:#2E86C1;color:#fff}
+.btn.primary:hover:not(:disabled){background:#3A95D2}
+.btn.on{background:#1E9E6A;border-color:#1E9E6A}
+.btn svg{width:16px;height:16px;flex:none}
+.btn:focus-visible,#progress:focus-visible,#veil:focus-visible{outline:3px solid #F5C15A;outline-offset:2px}
+.scn{min-width:96px;justify-content:center}
+.scn.active{background:#F39C12;border-color:#F39C12;color:#1B2B40}
+.grow{flex:1}
+#chip{font-size:14px;color:#B8C7DB;max-width:360px;line-height:1.35}
+.sep{width:1px;height:28px;background:#35527D}
+@media (max-width:900px){.btn{height:36px;padding:0 10px;font-size:13px}.scn{min-width:64px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="viewport">
+    <div id="frame">
+      <div id="stage" aria-label="P4 신선식품 발주 문제 설명 애니메이션">
+        <div id="hdr">
+          <div class="brand"><div class="mark">P4</div><div>신선식품 수요 예측 및 스마트 발주 최적화</div></div>
+          <div class="right"><span id="phase" class="problem">문제 진단</span><span id="sceneLabel">장면 1 / 6</span></div>
+        </div>
+        <div id="scenes"></div>
+        <div id="sub" role="status" aria-live="off"><span id="subText"></span></div>
+        <div id="veil" role="button" tabindex="0" aria-label="재생 시작">
+          <div class="play"><svg viewBox="0 0 24 24"><path d="M6 3.5v17l15-8.5z" fill="#fff"/></svg></div>
+          <div class="vt" id="vtTitle">P4 신선식품 수요 예측<br>및 스마트 발주 최적화</div>
+          <div class="vs" id="vtSub">문제 설명 20초 + 해결 방향 10초 · 총 30초</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="bar">
+    <div class="row">
+      <div id="progress" role="slider" tabindex="0" aria-label="진행 바" aria-valuemin="0" aria-valuemax="30" aria-valuenow="0">
+        <div id="track"><div id="fill"></div>
+          <div class="tick" style="left:16.666%"></div><div class="tick" style="left:33.333%"></div><div class="tick" style="left:50%"></div><div class="tick" style="left:66.666%"></div><div class="tick" style="left:83.333%"></div>
+        </div>
+      </div>
+      <div id="time">0.0 / 30.0초</div>
+    </div>
+    <div class="row">
+      <button class="btn primary" id="bStart" title="처음부터 재생 (Enter)"><svg viewBox="0 0 24 24"><path d="M6 3.5v17l15-8.5z" fill="currentColor"/></svg>시작</button>
+      <button class="btn" id="bPause" title="일시정지 / 계속 (Space)" disabled><svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z" fill="currentColor"/></svg><span id="bPauseT">일시정지</span></button>
+      <button class="btn" id="bRestart" title="현재 장면 처음부터 다시 재생 (R)"><svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z" fill="currentColor"/></svg>재시작</button>
+      <button class="btn" id="bStop" title="종료 후 처음 화면으로 (Esc)"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></svg>종료</button>
+      <span class="sep"></span>
+      <div class="row" id="scnRow" style="gap:8px"></div>
+      <span class="grow"></span>
+      <button class="btn on" id="bSound" title="음성 켜기/끄기 (M)">음성 켜짐</button>
+      <button class="btn" id="bRate" title="TTS 속도 방식">음성 속도: 장면에 맞춤</button>
+      <button class="btn" id="bFull" title="전체 화면 (F)">전체 화면</button>
+    </div>
+    <div class="row"><div id="chip"></div></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =========================================================
+   P4 30초 Motion Effect  —  단일 HTML, 외부 의존성 없음
+   · 모든 모션은 "경과 시간(elapsed)"의 함수로 그린다 → 일시정지/장면 이동/진행 바가 항상 일치
+   · 음성: scene1_voice.mp3 ~ scene6_voice.mp3 (또는 .wav)가 같은 폴더에 있으면 우선 사용,
+          없으면 Web Speech API(한국어 TTS), 그것도 안 되면 자막만 재생
+   ========================================================= */
+
+/* ---------- 데이터 (P4 보고서의 검증된 수치만 사용) ---------- */
+const DUR = 5, N = 6, TOTAL = DUR * N;
+const SCENES = [
+  { name:'문제 도입',  phase:'problem',  narration:'신선식품은 많이 주문하면 폐기가 늘고, 적게 주문하면 품절이 발생해 발주 결정이 매우 어렵습니다.' },
+  { name:'과잉 발주',  phase:'problem',  narration:'주문이 너무 많으면 팔리지 못한 재고가 남고, 결국 폐기로 이어져 큰 원가 손실이 발생합니다.' },
+  { name:'과소 발주',  phase:'problem',  narration:'반대로 주문이 부족하면 품절로 판매 기회를 놓치고, 고객 경험과 매출이 함께 악화됩니다.' },
+  { name:'기존 방식의 한계', phase:'problem', narration:'기존 시스템은 예측값에 12%를 일괄 가산하는 단순 규칙이어서, 프로모션과 명절의 급격한 수요 변화를 잘 반영하지 못합니다.' },
+  { name:'해결책 1',   phase:'solution', narration:'해결책은 AI가 요일, 이벤트, 과거 수요를 학습해 수요를 더 정확히 예측하고, SKU별 비용 구조에 맞춰 발주량을 최적화하는 것입니다.' },
+  { name:'해결책 2',   phase:'solution', narration:'여기에 유통기한별 동적 할인을 결합하면 남은 재고를 더 효과적으로 관리할 수 있으며, 스마트 발주와 함께 운영 개선의 방향을 제시할 수 있습니다.' }
+];
+const IDLE_TEXT = '시작 버튼을 눌러 재생하세요';
+
+/* ---------- 유틸 ---------- */
+const $ = s => document.querySelector(s);
+const clamp = (v,a=0,b=1) => Math.min(b, Math.max(a, v));
+const prog = (t,a,b) => clamp((t-a)/(b-a));
+const eo  = p => 1 - Math.pow(1-p, 3);
+const eio = p => p < .5 ? 4*p*p*p : 1 - Math.pow(-2*p+2, 3)/2;
+const back = p => { const c1 = 1.70158, c3 = c1+1; return 1 + c3*Math.pow(p-1,3) + c1*Math.pow(p-1,2); };
+const lerp = (a,b,p) => a + (b-a)*p;
+function mk(parent, css, html, cls){
+  const d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.style.cssText = css || '';
+  if (html != null) d.innerHTML = html;
+  parent.appendChild(d);
+  return d;
+}
+function tf(el,x=0,y=0,s=1,r=0){ el.style.transform = `translate(${x}px,${y}px) scale(${s}) rotate(${r}deg)`; }
+function op(el,o){ el.style.opacity = o; }
+const f2 = v => v.toFixed(2);
+
+/* ---------- 아이콘 (인라인 SVG) ---------- */
+const ICON = {
+ veg:`<svg viewBox="0 0 100 100"><path d="M50 92 L36 42 Q50 30 64 42 Z" fill="#F5A04A"/><path d="M44 52h12M42 64h16M46 76h8" stroke="#E08A2E" stroke-width="3" stroke-linecap="round"/><path d="M50 34 C40 20 34 14 28 12 C32 24 38 32 46 36 Z" fill="#3FA66B"/><path d="M50 34 C52 18 58 10 66 8 C64 22 58 30 52 36 Z" fill="#2E8B57"/><path d="M50 34 C58 24 68 22 76 24 C72 32 62 36 52 38 Z" fill="#4CB87A"/></svg>`,
+ fruit:`<svg viewBox="0 0 100 100"><path d="M50 30 C30 20 12 36 16 60 C20 82 38 92 50 86 C62 92 80 82 84 60 C88 36 70 20 50 30 Z" fill="#E74C3C"/><path d="M50 30 C50 22 52 16 58 10" stroke="#6B4A2B" stroke-width="5" stroke-linecap="round" fill="none"/><path d="M56 22 C64 12 76 12 82 18 C74 28 64 28 56 22 Z" fill="#3FA66B"/><path d="M28 48 C28 42 32 38 36 38" stroke="#fff" stroke-opacity=".55" stroke-width="5" stroke-linecap="round" fill="none"/></svg>`,
+ meat:`<svg viewBox="0 0 100 100"><path d="M18 52 C14 30 36 16 58 20 C82 24 92 44 84 64 C76 84 50 90 32 80 C22 74 20 62 18 52 Z" fill="#E98A8A"/><path d="M26 54 C26 36 42 28 58 30 C74 32 80 46 74 60 C68 74 48 78 36 70 C30 66 27 60 26 54 Z" fill="#F7B6B6"/><circle cx="60" cy="52" r="9" fill="#FCE4E4" stroke="#E98A8A" stroke-width="3"/><path d="M38 44 q6 -4 12 0 M40 62 q8 4 16 -2" stroke="#fff" stroke-opacity=".7" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`,
+ fish:`<svg viewBox="0 0 100 100"><path d="M10 50 C24 26 56 22 74 42 L92 28 L88 50 L92 72 L74 58 C56 78 24 74 10 50 Z" fill="#4FA3D9"/><path d="M30 38 C36 46 36 54 30 62" stroke="#2E86C1" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="24" cy="46" r="4" fill="#fff"/><circle cx="24" cy="46" r="2" fill="#1F3A5F"/><path d="M44 36 C52 44 52 56 44 64" stroke="#fff" stroke-opacity=".5" stroke-width="3" fill="none"/></svg>`,
+ warn:`<svg viewBox="0 0 100 100"><path d="M50 8 L94 88 H6 Z" fill="#F39C12" stroke="#E67E22" stroke-width="4" stroke-linejoin="round"/><rect x="45" y="36" width="10" height="28" rx="5" fill="#fff"/><circle cx="50" cy="76" r="6" fill="#fff"/></svg>`,
+ clock:`<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="#fff" stroke="#E67E22" stroke-width="8"/><path d="M50 24 V52 L68 62" stroke="#1F3A5F" stroke-width="7" stroke-linecap="round" fill="none"/></svg>`,
+ arrow:`<svg viewBox="0 0 100 60"><path d="M4 30 H80 M58 8 L86 30 L58 52" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`
+};
+const CRATE = (f,s)=>`<svg viewBox="0 0 130 100" style="display:block;width:100%;height:100%"><rect x="3" y="3" width="124" height="94" rx="10" style="fill:var(--bf,${f||'#DCEBF7'});stroke:var(--bs,${s||'#2E86C1'})" stroke-width="5"/><path d="M3 34H127M3 66H127" style="stroke:var(--bs,${s||'#2E86C1'})" stroke-width="4"/><rect x="42" y="42" width="46" height="14" rx="7" style="fill:#fff;stroke:var(--bs,${s||'#2E86C1'})" stroke-width="3"/></svg>`;
+const BIN = `<svg viewBox="0 0 200 260" style="display:block;width:100%;height:100%"><rect x="10" y="14" width="180" height="26" rx="10" fill="#6B7C93"/><rect x="72" y="0" width="56" height="18" rx="8" fill="#6B7C93"/><path d="M26 48 H174 L162 244 Q161 256 149 256 H51 Q39 256 38 244 Z" fill="#8FA1B8"/><path d="M70 72V232M100 72V232M130 72V232" stroke="#6B7C93" stroke-width="8" stroke-linecap="round"/></svg>`;
+const PERSON = `<svg viewBox="0 0 160 280" style="display:block;width:100%;height:100%"><circle cx="80" cy="52" r="34" fill="#F2C9A5"/><path d="M46 46 C46 20 114 20 114 46 C104 34 56 34 46 46 Z" fill="#3B2F2F"/><path d="M28 130 C28 98 52 90 80 90 C108 90 132 98 132 130 L132 190 H28 Z" fill="#2E86C1"/><rect x="38" y="190" width="30" height="80" rx="12" fill="#1F3A5F"/><rect x="92" y="190" width="30" height="80" rx="12" fill="#1F3A5F"/><path d="M28 132 C14 150 12 172 22 190" stroke="#2E86C1" stroke-width="22" stroke-linecap="round" fill="none"/><path d="M132 132 C146 150 148 172 138 190" stroke="#2E86C1" stroke-width="22" stroke-linecap="round" fill="none"/><circle cx="68" cy="52" r="4" fill="#1B2B40"/><circle cx="92" cy="52" r="4" fill="#1B2B40"/><path d="M68 72 q12 -8 24 0" stroke="#1B2B40" stroke-width="4" fill="none" stroke-linecap="round"/></svg>`;
+
+/* 박스 요소 생성 */
+function crateEl(parent,x,y,fill,stroke){
+  const d = mk(parent, `left:${x}px;top:${y}px;width:130px;height:100px`, CRATE(fill,stroke), 'a');
+  return d;
+}
+function tint(el,on){
+  if (on){ el.style.setProperty('--bf','#FDEDEC'); el.style.setProperty('--bs','#E74C3C'); }
+  else   { el.style.removeProperty('--bf'); el.style.removeProperty('--bs'); }
+}
+
+/* =========================================================
+   장면 빌더: 각 빌더는 update(t) 함수를 반환 (t = 장면 내 시간 0~5초)
+   ========================================================= */
+
+/* ---- Scene 1 : 문제 도입 ---- */
+function buildS1(c){
+  const title = mk(c,'left:260px;top:128px;width:1400px;text-align:center;font-size:76px;font-weight:800;color:#1F3A5F;letter-spacing:-.02em','신선식품 발주, 왜 어려울까?','a');
+  const cats = [['채소',ICON.veg],['과일',ICON.fruit],['정육',ICON.meat],['수산',ICON.fish]];
+  const tiles = cats.map((k,i)=>{
+    const x = 150 + (i%2)*210, y = 320 + Math.floor(i/2)*230;
+    return mk(c,`left:${x}px;top:${y}px;width:180px;height:200px;background:#fff;border-radius:24px;border:2px solid #D5DEE8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px`,
+      `<div style="width:104px;height:104px">${k[1]}</div><div style="font-size:34px;font-weight:700;color:#1F3A5F">${k[0]}</div>`,'a');
+  });
+  /* 중앙 박스 + 펄스 */
+  const rings = [0,1].map(()=>mk(c,'left:720px;top:290px;width:480px;height:480px;border-radius:50%;border:5px solid #17A2B8','', 'a'));
+  const wrap = mk(c,'left:740px;top:300px;width:440px;height:460px','', 'a');
+  mk(wrap,'position:absolute;left:70px;top:20px;width:110px;height:110px',ICON.veg);
+  mk(wrap,'position:absolute;left:170px;top:0px;width:110px;height:110px',ICON.fruit);
+  mk(wrap,'position:absolute;left:270px;top:20px;width:110px;height:110px',ICON.fish);
+  mk(wrap,'position:absolute;left:30px;top:100px;width:380px;height:292px',CRATE('#DCEBF7','#2E86C1'));
+  mk(wrap,'position:absolute;left:0;top:410px;width:440px;text-align:center;font-size:30px;font-weight:700;color:#5B6B80','신선식품 발주 박스');
+  /* 저울 (폐기 ↔ 품절) */
+  const bal = mk(c,'left:1280px;top:310px;width:480px;height:360px',
+    `<svg viewBox="0 0 400 300" style="width:100%;height:100%;overflow:visible">
+      <rect x="196" y="70" width="8" height="196" rx="4" fill="#9FB1C6"/><ellipse cx="200" cy="268" rx="70" ry="12" fill="#9FB1C6"/>
+      <line id="beam" x1="60" y1="70" x2="340" y2="70" stroke="#1F3A5F" stroke-width="9" stroke-linecap="round"/><circle cx="200" cy="70" r="12" fill="#1F3A5F"/>
+      <g id="panL"><line x1="0" y1="0" x2="-52" y2="100" stroke="#8FA1B8" stroke-width="4"/><line x1="0" y1="0" x2="52" y2="100" stroke="#8FA1B8" stroke-width="4"/>
+        <path d="M-72 100 H72 Q62 132 0 132 Q-62 132 -72 100 Z" fill="#E74C3C"/><text x="0" y="176" text-anchor="middle" font-size="34" font-weight="800" fill="#C0392B" font-family="inherit">폐기</text></g>
+      <g id="panR"><line x1="0" y1="0" x2="-52" y2="100" stroke="#8FA1B8" stroke-width="4"/><line x1="0" y1="0" x2="52" y2="100" stroke="#8FA1B8" stroke-width="4"/>
+        <path d="M-72 100 H72 Q62 132 0 132 Q-62 132 -72 100 Z" fill="#F39C12"/><text x="0" y="176" text-anchor="middle" font-size="34" font-weight="800" fill="#B9770E" font-family="inherit">품절</text></g>
+    </svg>`,'a');
+  const beam = bal.querySelector('#beam'), panL = bal.querySelector('#panL'), panR = bal.querySelector('#panR');
+  function setBal(deg){
+    const a = deg*Math.PI/180, ex = 140*Math.cos(a), ey = 140*Math.sin(a);
+    const lx = 200-ex, ly = 70-ey, rx = 200+ex, ry = 70+ey;
+    beam.setAttribute('x1',lx); beam.setAttribute('y1',ly); beam.setAttribute('x2',rx); beam.setAttribute('y2',ry);
+    panL.setAttribute('transform',`translate(${lx},${ly})`); panR.setAttribute('transform',`translate(${rx},${ry})`);
+  }
+  const chipCss = (x,bg,fg,bd)=>`left:${x}px;top:790px;width:320px;height:84px;border-radius:999px;background:${bg};color:${fg};border:4px solid ${bd};display:flex;align-items:center;justify-content:center;font-size:42px;font-weight:800`;
+  const chip1 = mk(c,chipCss(620,'#FDEDEC','#C0392B','#E74C3C'),'폐기 증가','a');
+  const chip2 = mk(c,chipCss(980,'#FEF5E7','#9A6208','#F39C12'),'품절 발생','a');
+  return t=>{
+    let p = eo(prog(t,0,.8)); op(title,p); tf(title,0,20*(1-p));
+    tiles.forEach((el,i)=>{ const s=.5+.12*i, q=eo(prog(t,s,s+.7)); op(el,q); tf(el,0,70*(1-q)); });
+    const cp = eo(prog(t,.3,1)); op(wrap,cp); tf(wrap,0,30*(1-cp));
+    rings.forEach((r,k)=>{ if (t<3){ op(r,0); return; } const ph=(((t-3)/1)+k*.5)%1; op(r,.5*(1-ph)); tf(r,0,0,.72+.5*ph); });
+    op(bal,eo(prog(t,1,1.8))); setBal(11*Math.sin((t-1.2)*2.4)*prog(t,1,2));
+    const c1 = eo(prog(t,1.5,2.2)); op(chip1,c1); tf(chip1,-220*(1-c1),0);
+    const c2 = eo(prog(t,2.2,3.0)); op(chip2,c2); tf(chip2,220*(1-c2),0);
+  };
+}
+
+/* ---- Scene 2 : 과잉 발주 → 폐기 ---- */
+function buildS2(c){
+  mk(c,'left:150px;top:722px;width:660px;height:6px;border-radius:3px;background:#C9D4E0','','a').style.opacity=1;
+  const lab = mk(c,'left:180px;top:322px;width:580px;text-align:center;font-size:40px;font-weight:800;color:#1F3A5F','<span style="background:#E3EEF8;padding:8px 30px;border-radius:999px">발주 과다</span>','a');
+  const boxes = [];
+  for (let r=0;r<3;r++) for (let col=0;col<4;col++){
+    const x = 185+col*148, y = 616-110*r;
+    boxes.push({el:crateEl(c,x,y), x, y, k:r*4+col});
+  }
+  const waste = [8,9,10,11];
+  const binX=1330, binY=430;
+  const binTag = mk(c,'left:1330px;top:352px;width:240px;text-align:center;font-size:40px;font-weight:800;color:#C0392B','<span style="background:#FDEDEC;padding:8px 30px;border-radius:999px;border:3px solid #E74C3C">폐기</span>','a');
+  const bin = mk(c,`left:${binX}px;top:${binY}px;width:240px;height:312px`,BIN,'a');
+  const num = mk(c,'left:760px;top:150px;width:500px;text-align:center','<div style="font-size:40px;font-weight:700;color:#5B6B80">폐기율</div><div id="v2" style="font-size:150px;line-height:1.05;font-weight:800;color:#E74C3C;letter-spacing:-.02em">0.00%</div>','a');
+  const v2 = num.querySelector('#v2');
+  const loss = mk(c,'left:260px;top:768px;width:1400px;text-align:center;font-size:60px;font-weight:800;color:#C0392B',
+    '폐기 손실 <span id="l2" style="background:linear-gradient(#FADBD8,#FADBD8) no-repeat 0 90%/0% 40%;padding:0 8px">10억 8,711만원</span>','a');
+  const l2 = loss.querySelector('#l2');
+  const tx = binX+120-65, ty = 540-50;
+  return t=>{
+    op(lab,eo(prog(t,0,.5)));
+    boxes.forEach(b=>{
+      const d = eo(prog(t,.05*b.k,.05*b.k+.55));
+      let o = clamp(d*3), x=0, y=-(1-d)*260, s=1;
+      const j = waste.indexOf(b.k);
+      if (j>=0){
+        const fp = eio(prog(t,1.5+.22*j,2.34+.22*j));
+        x = (tx-b.x)*fp; y += (ty-b.y)*fp - 70*Math.sin(Math.PI*fp); s = 1-.55*fp;
+        tint(b.el, fp>0.02);
+        if (fp>.88) o *= 1-(fp-.88)/.12;
+      }
+      op(b.el,o); tf(b.el,x,y,s);
+    });
+    op(binTag,eo(prog(t,.3,1))); op(bin,eo(prog(t,.3,1)));
+    let bump = 0;
+    waste.forEach((k,j)=>{ const d = t-(1.5+.22*j+.84); if (d>0 && d<.3) bump += .07*(1-d/.3); });
+    tf(bin,0,0,1+bump);
+    op(num,eo(prog(t,2,2.5)));
+    v2.textContent = f2(9.79*eo(prog(t,2.2,3.5)))+'%';
+    const lp = eo(prog(t,3.2,5));
+    op(loss,clamp(lp*2)); tf(loss,0,14*(1-lp)); l2.style.backgroundSize = `${lp*100}% 40%`;
+  };
+}
+
+/* ---- Scene 3 : 과소 발주 → 품절 ---- */
+function buildS3(c){
+  const shelf = mk(c,'left:180px;top:380px;width:600px;height:360px','','a');
+  const sv = mk(shelf,'position:absolute;left:0;top:0;width:600px;height:360px',
+    `<svg viewBox="0 0 600 360" style="width:100%;height:100%"><rect x="6" y="0" width="14" height="360" rx="5" fill="#9FB1C6"/><rect x="580" y="0" width="14" height="360" rx="5" fill="#9FB1C6"/>
+     <rect x="0" y="116" width="600" height="14" rx="5" fill="#7F93AB"/><rect x="0" y="231" width="600" height="14" rx="5" fill="#7F93AB"/><rect x="0" y="346" width="600" height="14" rx="5" fill="#7F93AB"/></svg>`);
+  const icons = [ICON.veg,ICON.fruit,ICON.meat,ICON.fish], cols = ['#DDEFD9','#FDE3E3','#FBE4EA','#E3EEF9'];
+  const items = [];
+  for (let r=0;r<3;r++) for (let i=0;i<4;i++){
+    const k = r*4+i;
+    const el = mk(shelf,`position:absolute;left:${40+i*135}px;top:${34+r*115}px;width:105px;height:80px;border-radius:14px;background:${cols[(i+r)%4]};border:2px solid rgba(31,58,95,.18);display:flex;align-items:center;justify-content:center`,
+      `<div style="width:56px;height:56px">${icons[(i+r)%4]}</div>`);
+    items.push(el);
+  }
+  const order = [3,7,1,10,5,0,8,2,11,6,4,9];
+  const rank = []; order.forEach((k,idx)=>rank[k]=idx);
+  const badge = mk(c,'left:350px;top:446px;width:260px;height:260px;border-radius:50%;background:#E74C3C;border:10px solid #fff;color:#fff;display:flex;align-items:center;justify-content:center;font-size:96px;font-weight:800;box-shadow:0 8px 24px rgba(231,76,60,.4)','품절','a');
+  const person = mk(c,'left:1340px;top:470px;width:170px;height:290px',PERSON,'a');
+  const bubble = mk(c,'left:1320px;top:330px;width:380px;height:120px;background:#fff;border:4px solid #1F3A5F;border-radius:30px;display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:800;color:#1F3A5F',
+    '상품이 없어요<div style="position:absolute;left:96px;bottom:-22px;width:36px;height:36px;background:#fff;border-right:4px solid #1F3A5F;border-bottom:4px solid #1F3A5F;transform:rotate(45deg)"></div>','a');
+  const num = mk(c,'left:760px;top:150px;width:500px;text-align:center','<div style="font-size:40px;font-weight:700;color:#5B6B80">품절률</div><div id="v3" style="font-size:150px;line-height:1.05;font-weight:800;color:#F39C12;letter-spacing:-.02em">0.00%</div>','a');
+  const v3 = num.querySelector('#v3');
+  const loss = mk(c,'left:260px;top:768px;width:1400px;text-align:center;font-size:60px;font-weight:800;color:#9A6208','기회 손실 <span style="background:linear-gradient(#FDEBD0,#FDEBD0) no-repeat 0 90%/100% 40%;padding:0 8px">1억 6,506만원</span>','a');
+  return t=>{
+    op(shelf,eo(prog(t,0,.3)));
+    items.forEach((el,k)=>{ const s=.1+.12*rank[k], p=eo(prog(t,s,s+.25)); op(el,1-p); tf(el,0,0,1-.35*p); });
+    const bp = prog(t,1,1.6); op(badge,clamp(bp*4));
+    tf(badge,0,0,(bp<1?back(bp):1)*(1+.03*Math.sin(t*5)*(bp>=1?1:0)),-10);
+    op(person,eo(prog(t,.3,.9)));
+    const bb = prog(t,2,2.5); op(bubble,clamp(bb*3)); tf(bubble,0,0,bb<1?back(bb):1);
+    op(num,eo(prog(t,2.9,3.3)));
+    v3.textContent = f2(2.38*eo(prog(t,3,4)))+'%';
+    const lp = eo(prog(t,3.8,5)); op(loss,lp); tf(loss,0,14*(1-lp));
+  };
+}
+
+/* ---- Scene 4 : 기존 방식의 한계 ---- */
+function buildS4(c){
+  const title = mk(c,'left:260px;top:116px;width:1400px;text-align:center;font-size:72px;font-weight:800;color:#1F3A5F;letter-spacing:-.02em','기존 방식의 한계','a');
+  const card = mk(c,'left:330px;top:244px;width:1260px;height:170px;background:#1F3A5F;border-radius:28px;display:flex;align-items:center;justify-content:center;gap:22px;color:#fff;font-size:68px;font-weight:800',
+    '<span>기존 발주 = 시스템 예측 +</span><span id="p12" style="display:inline-block;color:#F39C12;padding:0 20px;border-radius:18px;background:rgba(243,156,18,.2)">12%</span>','a');
+  const p12 = card.querySelector('#p12');
+  const bA = mk(c,'left:140px;top:500px;width:830px;height:100px;background:#E3F6F8;border-left:12px solid #17A2B8;border-radius:16px;display:flex;align-items:center;padding:0 36px;font-size:42px;font-weight:800;color:#0E6F80','평시: 어느 정도 작동','a');
+  const bB = mk(c,'left:140px;top:630px;width:830px;height:130px;background:#FDEDEC;border-left:12px solid #E74C3C;border-radius:16px;display:flex;align-items:center;padding:0 36px;font-size:42px;font-weight:800;color:#C0392B;line-height:1.3','프로모션·명절: 수요 급증 대응 부족','a');
+  const warn = mk(c,'left:140px;top:786px;width:600px;height:64px;display:flex;align-items:center;gap:16px;font-size:36px;font-weight:800;color:#C0392B',`<div style="width:54px;height:54px">${ICON.warn}</div>예측오차 증가`,'a');
+  /* 막대 그래프: 기존 시스템 WAPE (보고서 표 7) */
+  const base = 800, unit = 260/30, bars = [
+    {x:1100,v:17.22,lab:'평시',col:'#17A2B8'},{x:1300,v:23.51,lab:'프로모션만',col:'#F39C12'},{x:1500,v:27.26,lab:'명절만',col:'#E74C3C'}];
+  const ctitle = mk(c,'left:1040px;top:468px;width:640px;text-align:center;font-size:30px;font-weight:700;color:#5B6B80','기존 시스템 예측 오차 (WAPE)','a');
+  const axis = mk(c,`left:1060px;top:${base}px;width:600px;height:4px;background:#9FB1C6`,'','a'); axis.style.opacity=1;
+  const refY = base - 17.22*unit;
+  const ref = mk(c,`left:1060px;top:${refY}px;width:600px;height:0;border-top:4px dashed #E74C3C`,'','a');
+  const refT = mk(c,`left:1660px;top:${refY-18}px;width:220px;font-size:26px;font-weight:800;color:#C0392B`,'평시 수준','a');
+  const bel = bars.map(b=>{
+    const bar = mk(c,`left:${b.x}px;top:${base}px;width:130px;height:0;background:${b.col};border-radius:12px 12px 0 0`,'', 'a'); bar.style.opacity=1;
+    const val = mk(c,`left:${b.x-20}px;top:${base-40}px;width:170px;text-align:center;font-size:40px;font-weight:800;color:${b.col==='#17A2B8'?'#0E6F80':b.col==='#F39C12'?'#9A6208':'#C0392B'}`,'', 'a');
+    const lb = mk(c,`left:${b.x-30}px;top:${base+16}px;width:190px;text-align:center;font-size:30px;font-weight:700;color:#1B2B40`,b.lab,'a');
+    return {bar,val,lb,b};
+  });
+  return t=>{
+    op(title,eo(prog(t,0,.5)));
+    const cp = prog(t,0,1); op(card,clamp(cp*3)); tf(card,0,0,cp<1?.6+.4*back(cp):1);
+    if (t>=1 && t<2){ const k=Math.abs(Math.sin(Math.PI*(t-1)*2)); tf(p12,0,0,1+.3*k); p12.style.background=`rgba(243,156,18,${.2+.5*k})`; }
+    else { tf(p12,0,0,1); p12.style.background='rgba(243,156,18,.2)'; }
+    const a = eo(prog(t,2,2.6)); op(bA,a); tf(bA,-120*(1-a),0);
+    const b = eo(prog(t,2.5,3.1)); op(bB,b); tf(bB,-120*(1-b),0);
+    op(warn,eo(prog(t,2.9,3.4)));
+    op(ctitle,eo(prog(t,2.6,3)));
+    const rp = eo(prog(t,2.4,3.2)); op(ref,rp); ref.style.width = (600*rp)+'px'; op(refT,eo(prog(t,3,3.5)));
+    bel.forEach((e,i)=>{
+      const p = eo(prog(t,3+.25*i,4+.25*i));
+      const h = e.b.v*unit*p;
+      e.bar.style.height = h+'px'; e.bar.style.top = (base-h)+'px';
+      e.val.style.top = (base-h-52)+'px'; e.val.textContent = (e.b.v*p).toFixed(1)+'%';
+      op(e.val,clamp(p*3)); op(e.lb,clamp(prog(t,2.8,3.2)));
+    });
+  };
+}
+
+/* ---- Scene 5 : 해결책 1 (AI 예측 + Newsvendor) ---- */
+function buildS5(c){
+  const title = mk(c,'left:160px;top:112px;width:1600px;text-align:center;font-size:66px;font-weight:800;color:#1F3A5F;letter-spacing:-.02em','AI 수요 예측 + SKU별 스마트 발주','a');
+  const chipCss = (y)=>`left:110px;top:${y}px;width:290px;height:76px;border-radius:16px;background:#E3F4F7;border:4px solid #17A2B8;color:#0E6F80;display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:800`;
+  const labels = ['요일','이벤트','과거 수요'], ys = [280,384,488];
+  const chips = labels.map((l,i)=>mk(c,chipCss(ys[i]),l,'a'));
+  /* 흐르는 점 */
+  const dots = [];
+  ys.forEach((y,i)=>{ for(let k=0;k<3;k++) dots.push({el:mk(c,'left:0;top:0;width:20px;height:20px;border-radius:50%;background:#17A2B8','', 'a'), y:y+38, i, k}); });
+  const waves = [0,1,2].map(()=>mk(c,'left:610px;top:310px;width:260px;height:260px;border-radius:50%;border:5px solid #17A2B8','', 'a'));
+  const ai = mk(c,'left:615px;top:315px;width:250px;height:250px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3A6EA8,#1F3A5F);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800',
+    '<div style="font-size:84px;line-height:1">AI</div><div style="font-size:34px;margin-top:6px">수요 예측</div>','a');
+  const arr1 = mk(c,'left:880px;top:415px;width:110px;height:50px;color:#2E86C1',ICON.arrow,'a');
+  const opt = mk(c,'left:1000px;top:320px;width:370px;height:240px;background:#fff;border:5px solid #2E86C1;border-radius:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px',
+    '<div style="font-size:44px;font-weight:800;color:#1F3A5F">SKU별 발주 최적화</div><div style="font-size:32px;font-weight:700;color:#2E86C1">Newsvendor</div>','a');
+  const cost = mk(c,'left:1040px;top:604px;width:290px;height:70px;border-radius:16px;background:#FEF5E7;border:4px solid #F39C12;color:#9A6208;display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:800','비용 구조','a');
+  const arrUp = mk(c,'left:1170px;top:564px;width:30px;height:38px',`<svg viewBox="0 0 30 46" style="width:100%;height:100%"><path d="M15 44 V6 M4 18 L15 5 L26 18" stroke="#F39C12" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,'a');
+  const arr2 = mk(c,'left:1380px;top:415px;width:92px;height:50px;color:#2E86C1',ICON.arrow,'a');
+  const res = mk(c,'left:1480px;top:330px;width:330px;height:220px;background:#1F3A5F;border-radius:26px;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px',
+    '<div style="font-size:46px;font-weight:800">권장 발주량</div><div style="font-size:30px;font-weight:600;color:#BFD4EA">SKU별 · 일별</div>','a');
+  /* 성능 수치 */
+  const oldB = mk(c,'left:300px;top:712px;width:520px;text-align:center','<div style="font-size:30px;font-weight:700;color:#5B6B80">기존 시스템 WAPE</div><div style="font-size:100px;line-height:1.1;font-weight:800;color:#8795A8">18.66%</div>','a');
+  const arrow = mk(c,'left:890px;top:766px;width:140px;height:70px;color:#8795A8',ICON.arrow,'a');
+  const newB = mk(c,'left:1100px;top:712px;width:560px;text-align:center','<div style="font-size:30px;font-weight:700;color:#5B6B80">AI 예측 WAPE (6월 테스트)</div><div id="v5" style="font-size:100px;line-height:1.1;font-weight:800;color:#E74C3C">18.66%</div>','a');
+  const v5 = newB.querySelector('#v5');
+  function mix(c1,c2,p){ const h=s=>[1,3,5].map(i=>parseInt(s.slice(i,i+2),16)); const a=h(c1),b=h(c2); return '#'+a.map((x,i)=>Math.round(lerp(x,b[i],p)).toString(16).padStart(2,'0')).join(''); }
+  return t=>{
+    op(title,eo(prog(t,0,.5)));
+    chips.forEach((el,i)=>{ const p=eo(prog(t,.05*i,.05*i+.4)); op(el,p); tf(el,-60*(1-p),0); });
+    dots.forEach(d=>{
+      if (t<.2||t>2.3){ op(d.el,0); return; }
+      const ph = (((t-.2)*1.0)+d.k/3+d.i*.11)%1;
+      const x = lerp(410,610,ph), y = lerp(d.y,440,eo(ph));
+      op(d.el,Math.sin(Math.PI*ph)); tf(d.el,x-10,y-10);
+    });
+    op(ai,eo(prog(t,.3,.9))); tf(ai,0,0,.8+.2*eo(prog(t,.3,.9))+ (t>1&&t<2?.03*Math.sin(t*14):0));
+    waves.forEach((w,k)=>{ const ph=(t-1-.33*k)/1.0; if (ph<0||ph>1){op(w,0);return;} op(w,.6*(1-ph)); tf(w,0,0,1+1.0*ph); });
+    op(cost,eo(prog(t,1.2,1.8))); op(arrUp,eo(prog(t,1.4,2)));
+    const a1 = eo(prog(t,2,2.4)); op(arr1,a1); tf(arr1,-30*(1-a1),0);
+    op(opt,eo(prog(t,1.6,2.2))); tf(opt,0,0,.9+.1*eo(prog(t,1.6,2.2)));
+    const a2 = eo(prog(t,2.3,2.7)); op(arr2,a2); tf(arr2,-30*(1-a2),0);
+    const rp = prog(t,2,3); op(res,clamp(rp*3)); tf(res,0,0,rp<1?.6+.4*back(rp):1);
+    op(oldB,eo(prog(t,3,3.5))); op(arrow,eo(prog(t,3.4,3.8))); op(newB,eo(prog(t,3.6,4)));
+    const cp = eo(prog(t,3.6,4.8));
+    v5.textContent = f2(lerp(18.66,12.75,cp))+'%'; v5.style.color = mix('#E74C3C','#2E86C1',cp);
+  };
+}
+
+/* ---- Scene 6 : 해결책 2 + 마무리 ---- */
+function buildS6(c){
+  const lab = mk(c,'left:120px;top:330px;width:440px;text-align:center;font-size:42px;font-weight:800;color:#1F3A5F','남은 재고','a');
+  const pos = [[150,430],[290,430],[220,540]];
+  const boxes = pos.map(([x,y],i)=>{
+    const el = mk(c,`left:${x}px;top:${y}px;width:130px;height:100px`, CRATE('#DCEBF7','#2E86C1')+`<div class="tag" style="position:absolute;right:-26px;top:-22px;padding:4px 16px;border-radius:999px;background:#F39C12;color:#1B2B40;font-size:28px;font-weight:800;border:3px solid #fff;opacity:0">할인</div>`,'a');
+    return {el,x,y,i,tag:el.querySelector('.tag')};
+  });
+  const mid = mk(c,'left:640px;top:380px;width:500px;height:190px;background:#FEF5E7;border:5px solid #F39C12;border-radius:26px;display:flex;align-items:center;gap:22px;padding:0 30px',
+    `<div style="width:96px;height:96px;flex:none">${ICON.clock}</div><div style="font-size:44px;font-weight:800;color:#1B2B40;line-height:1.3">유통기한 임박<br><span style="color:#B9770E">→ 할인 판매</span></div>`,'a');
+  const targets = [[660,610],[800,610],[940,610]];
+  const card = mk(c,'left:1190px;top:196px;width:600px;height:560px;background:#fff;border:3px solid #D5DEE8;border-radius:28px;padding:34px 40px',
+    `<div style="font-size:30px;font-weight:700;color:#5B6B80">기대 효과 (6월 단일기간 모의)</div>
+     <div id="r1" style="margin-top:26px"><div style="font-size:32px;font-weight:700;color:#1B2B40">미판매 잔량</div><div style="font-size:70px;font-weight:800;color:#2E86C1;line-height:1.1"><span id="n1">0.0</span>% 감소</div></div>
+     <div id="r2" style="margin-top:18px"><div style="font-size:32px;font-weight:700;color:#1B2B40">모의 순이익</div><div style="font-size:70px;font-weight:800;color:#1E9E6A;line-height:1.1"><span id="n2">0.00</span>% 증가</div></div>
+     <div id="r3" style="margin-top:24px;font-size:30px;font-weight:800;color:#9A6208;background:#FEF5E7;border-radius:12px;padding:10px 16px">※ 품절 증가 위험은 추가 관리 필요</div>
+     <div id="r4" style="margin-top:14px;font-size:22px;color:#5B6B80;line-height:1.4">동적 할인 효과는 가정 기반 시나리오(검증 전)</div>`,'a');
+  const r1=card.querySelector('#r1'),r2=card.querySelector('#r2'),r3=card.querySelector('#r3'),r4=card.querySelector('#r4'),n1=card.querySelector('#n1'),n2=card.querySelector('#n2');
+  const banner = mk(c,'left:340px;top:790px;width:1240px;height:96px;border-radius:999px;background:#1F3A5F;color:#fff;display:flex;align-items:center;justify-content:center;font-size:64px;font-weight:800;letter-spacing:-.01em','스마트 발주 + 동적 할인','a');
+  return t=>{
+    op(lab,eo(prog(t,0,.4)));
+    op(mid,eo(prog(t,.8,1.4))); tf(mid,0,0,.9+.1*eo(prog(t,.8,1.4)));
+    boxes.forEach(b=>{
+      op(b.el,eo(prog(t,0,.4)));
+      const tg = clamp((t-(.2+.2*b.i))/.35); op(b.tag, tg>0? 1:0); b.tag.style.transform = `scale(${tg<1?back(tg):1})`;
+      const mv = eio(prog(t,.8+.1*b.i,1.5+.1*b.i));
+      tf(b.el,(targets[b.i][0]-b.x)*mv,(targets[b.i][1]-b.y)*mv,1);
+    });
+    op(card,eo(prog(t,1,1.5))); tf(card,60*(1-eo(prog(t,1,1.5))),0);
+    const k1=eo(prog(t,1,1.6)); op(r1,k1); n1.textContent=(63.6*eo(prog(t,1,2))).toFixed(1);
+    const k2=eo(prog(t,1.6,2.2)); op(r2,k2); n2.textContent=f2(15.24*eo(prog(t,1.6,2.6)));
+    op(r3,eo(prog(t,2.2,2.8))); op(r4,eo(prog(t,2.4,3)));
+    const bp = prog(t,3,3.6); op(banner,clamp(bp*3)); tf(banner,0,0,(bp<1?.85+.15*back(bp):1)*(t>3.6?1+.015*Math.sin((t-3.6)*5):1));
+  };
+}
+
+const BUILDERS = [buildS1,buildS2,buildS3,buildS4,buildS5,buildS6];
+
+/* =========================================================
+   엔진
+   ========================================================= */
+const scenesEl = $('#scenes'), sceneNodes = [], updaters = [];
+let errorScenes = new Set();
+BUILDERS.forEach((b,i)=>{
+  const node = document.createElement('div'); node.className='scene'; scenesEl.appendChild(node); sceneNodes.push(node);
+  try { updaters.push(b(node)); }
+  catch(e){ console.error('장면 생성 오류', i+1, e); errorScenes.add(i); updaters.push(null);
+    node.innerHTML = '<div style="position:absolute;left:0;top:300px;width:1920px;text-align:center;font-size:44px;color:#C0392B;font-weight:800">장면 데이터를 불러오지 못했습니다 (장면 '+(i+1)+')</div>'; }
+});
+
+let state = 'idle';           // idle | playing | paused | ended
+let elapsed = 0, lastTs = 0, raf = 0, curScene = -1, holdT = 0;
+let soundOn = true, waitMode = false;
+
+/* ---------- 음성 ---------- */
+const files = new Array(N).fill(undefined);   // Audio | null | undefined(확인 중)
+let vToken = 0, voiceBusy = false, ttsVoice = null, voiceNote = '';
+const synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
+
+function probeFile(i){
+  const exts = ['mp3','wav']; let k = 0, done = false;
+  const a = new Audio(); a.preload = 'auto';
+  const next = ()=>{ if (done) return; if (k>=exts.length){ done=true; files[i]=null; updateChip(); return; } a.src = `scene${i+1}_voice.${exts[k++]}`; };
+  a.addEventListener('canplaythrough',()=>{ if(done) return; done=true; files[i]=a; updateChip(); });
+  a.addEventListener('error',next);
+  next();
+}
+function pickVoice(){
+  if (!synth) return;
+  const vs = synth.getVoices().filter(v=>/^ko/i.test(v.lang));
+  const fem = /female|여성|yuna|sun-?hi|heami|seoyeon|nara|google 한국의|유나|선희/i;
+  ttsVoice = vs.find(v=>fem.test(v.name)) || vs[0] || null;
+  updateChip();
+}
+if (synth){ pickVoice(); synth.addEventListener && synth.addEventListener('voiceschanged',pickVoice); }
+for (let i=0;i<N;i++) probeFile(i);
+
+function stopVoice(){
+  vToken++; voiceBusy = false;
+  files.forEach(a=>{ if (a){ try{ a.pause(); a.currentTime = 0; a.onended = null; }catch(e){} } });
+  if (synth){ try{ synth.cancel(); }catch(e){} }
+}
+function syllables(s){ return (s.match(/[가-힣]/g)||[]).length; }
+function startVoice(i){
+  stopVoice();
+  if (!soundOn || i<0 || i>=N) return;
+  const my = ++vToken;
+  const a = files[i];
+  if (a){
+    voiceBusy = true;
+    a.onended = ()=>{ if (vToken===my) voiceBusy = false; };
+    a.currentTime = 0;
+    const pr = a.play();
+    if (pr && pr.catch) pr.catch(()=>{ if (vToken===my){ files[i]=null; updateChip(); speakTTS(i,my); } });
+    return;
+  }
+  speakTTS(i,my);
+}
+function speakTTS(i,my){
+  if (!synth || typeof SpeechSynthesisUtterance==='undefined'){ voiceBusy=false; return; }
+  voiceBusy = true;
+  setTimeout(()=>{
+    if (vToken!==my) return;
+    let started = false;
+    const text = SCENES[i].narration;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ko-KR'; if (ttsVoice) u.voice = ttsVoice; u.pitch = 1.05;
+    // 장면(5초)에 맞춤: 자연 속도 약 6음절/초 가정, 최대 2배속. 자연 속도 모드는 1배속.
+    u.rate = waitMode ? 1 : clamp((syllables(text)/6)/(DUR-.3), 1, 2);
+    u.onstart = ()=>{ started = true; };
+    u.onend = u.onerror = ()=>{ if (vToken===my) voiceBusy = false; };
+    try{ synth.resume(); synth.speak(u); }catch(e){ voiceBusy=false; return; }
+    setTimeout(()=>{ if (vToken===my && !started && !(synth.speaking)) voiceBusy=false; },2500);
+  },80);
+}
+function updateChip(){
+  const have = files.filter(Boolean).length;
+  let t;
+  if (!soundOn) t = '음성 꺼짐 · 자막만 재생';
+  else if (have===N) t = '음성: 파일 6개 사용 (scene1~6_voice)';
+  else if (have>0) t = `음성: 파일 ${have}개 + 나머지 TTS`;
+  else if (synth && ttsVoice) t = `음성: 브라우저 TTS (${ttsVoice.name}) · 여성 음성은 브라우저/OS에 따라 보장되지 않음`;
+  else if (synth) t = '음성: 브라우저 TTS (한국어 음성을 찾는 중이거나 없음)';
+  else t = '음성 없음 · 자막만 재생 (이 브라우저는 TTS 미지원)';
+  $('#chip').textContent = t;
+}
+
+/* ---------- 렌더 ---------- */
+const subText = $('#subText'), veil = $('#veil');
+function setScene(i){
+  if (i===curScene) return;
+  curScene = i;
+  sceneNodes.forEach((n,k)=>n.style.display = (k===i)?'block':'none');
+  const s = SCENES[i];
+  $('#sceneLabel').textContent = `장면 ${i+1} / 6 · ${s.name}`;
+  const ph = $('#phase'); ph.className = s.phase; ph.textContent = s.phase==='problem' ? '문제 진단' : '해결 방향';
+  document.querySelectorAll('.scn').forEach((b,k)=>b.classList.toggle('active',k===i));
+}
+function render(){
+  let i, local;
+  if (state==='idle'){ i = 0; local = 3.4; }
+  else { i = Math.min(N-1, Math.floor(elapsed/DUR + 1e-9)); local = clamp(elapsed - i*DUR, 0, DUR); }
+  setScene(i);
+  const u = updaters[i]; if (u){ try{ u(local); }catch(e){ console.error(e); } }
+  const node = sceneNodes[i];
+  node.style.opacity = state==='idle' ? 1 : eo(prog(local,0,.35));
+  // 자막
+  if (state==='idle'){ subText.textContent = IDLE_TEXT; $('#sub').style.opacity = 1; }
+  else {
+    if (subText.textContent !== SCENES[i].narration) subText.textContent = SCENES[i].narration;
+    $('#sub').style.opacity = eo(prog(local,0,.3));
+  }
+  // 진행 바
+  const e = state==='idle' ? 0 : elapsed;
+  $('#fill').style.width = (100*e/TOTAL)+'%';
+  $('#time').textContent = `${e.toFixed(1)} / ${TOTAL.toFixed(1)}초`;
+  $('#progress').setAttribute('aria-valuenow', e.toFixed(1));
+}
+function setUI(){
+  veil.classList.toggle('hidden', state==='playing');
+  $('#bPause').disabled = (state==='idle' || state==='ended');
+  $('#bPauseT').textContent = state==='paused' ? '계속 재생' : '일시정지';
+  const vt = $('#vtTitle'), vs = $('#vtSub');
+  if (state==='idle'){ vt.innerHTML = 'P4 신선식품 수요 예측<br>및 스마트 발주 최적화'; vs.textContent = '문제 설명 20초 + 해결 방향 10초 · 총 30초'; }
+  if (state==='paused'){ vt.innerHTML = '일시정지'; vs.textContent = '누르면 현재 장면 처음부터 다시 재생합니다'; }
+  if (state==='ended'){ vt.innerHTML = '재생이 끝났습니다'; vs.textContent = '누르면 처음부터 다시 재생합니다'; }
+}
+
+/* ---------- 재생 루프 ---------- */
+function loop(ts){
+  raf = 0;
+  if (state!=='playing') return;
+  const dt = Math.min(.1, Math.max(0,(ts-lastTs)/1000)); lastTs = ts;
+  const idx = Math.min(N-1, Math.floor(elapsed/DUR + 1e-9));
+  const local = elapsed - idx*DUR;
+  // 자연 속도 모드: 장면 끝에서 음성이 끝날 때까지 대기 (최대 12초)
+  if (waitMode && voiceBusy && local >= DUR-.03 && holdT < 12){
+    holdT += dt; elapsed = idx*DUR + DUR-.03;
+  } else {
+    holdT = 0;
+    const prev = elapsed; elapsed += dt;
+    if (elapsed >= TOTAL){ elapsed = TOTAL - .001; render(); finish(); return; }
+    const pi = Math.floor(prev/DUR), ni = Math.floor(elapsed/DUR);
+    if (ni !== pi) startVoice(ni);
+  }
+  render();
+  raf = requestAnimationFrame(loop);
+}
+function ensureLoop(){ if (!raf){ lastTs = performance.now(); raf = requestAnimationFrame(loop); } }
+function finish(){ state = 'ended'; stopVoice(); setUI(); render(); }
+
+/* ---------- 사용자 동작 ---------- */
+function playFrom(sec){
+  if (raf){ cancelAnimationFrame(raf); raf = 0; }
+  elapsed = clamp(sec,0,TOTAL-.001); holdT = 0; state = 'playing';
+  setUI(); render(); startVoice(Math.min(N-1,Math.floor(elapsed/DUR))); ensureLoop();
+}
+function doStart(){ playFrom(0); }
+function doPause(){
+  if (state==='playing'){ state='paused'; if (raf){ cancelAnimationFrame(raf); raf=0; } stopVoice(); setUI(); }
+  else if (state==='paused'){ playFrom(Math.floor(elapsed/DUR)*DUR); }   // 동기화 안정성: 현재 장면 처음부터
+}
+function doRestart(){
+  if (state==='idle' || state==='ended'){ playFrom(0); return; }
+  playFrom(Math.min(N-1,Math.floor(elapsed/DUR))*DUR);
+}
+function doStop(){
+  if (raf){ cancelAnimationFrame(raf); raf=0; }
+  stopVoice(); state='idle'; elapsed=0; holdT=0; curScene=-1; setUI(); render();
+}
+function jump(i){ playFrom(i*DUR); }
+
+$('#bStart').onclick = doStart;
+$('#bPause').onclick = doPause;
+$('#bRestart').onclick = doRestart;
+$('#bStop').onclick = doStop;
+veil.onclick = ()=>{ if (state==='paused') doPause(); else doStart(); };
+veil.onkeydown = e=>{ if (e.key==='Enter'||e.key===' '){ e.preventDefault(); veil.click(); } };
+const scnRow = $('#scnRow');
+SCENES.forEach((s,i)=>{ const b=document.createElement('button'); b.className='btn scn'; b.textContent=`장면 ${i+1}`; b.title=`${i+1}. ${s.name} (${i+1})`; b.onclick=()=>jump(i); scnRow.appendChild(b); });
+$('#progress').addEventListener('click',e=>{
+  const r = $('#track').getBoundingClientRect();
+  jump(Math.min(N-1,Math.max(0,Math.floor(((e.clientX-r.left)/r.width)*N))));
+});
+$('#bSound').onclick = ()=>{
+  soundOn = !soundOn; $('#bSound').textContent = soundOn?'음성 켜짐':'음성 꺼짐'; $('#bSound').classList.toggle('on',soundOn);
+  if (!soundOn) stopVoice(); else if (state==='playing') startVoice(Math.min(N-1,Math.floor(elapsed/DUR)));
+  updateChip();
+};
+$('#bRate').onclick = ()=>{
+  waitMode = !waitMode;
+  $('#bRate').textContent = waitMode ? '음성 속도: 자연 속도(장면 연장)' : '음성 속도: 장면에 맞춤';
+  if (state==='playing') startVoice(Math.min(N-1,Math.floor(elapsed/DUR)));
+};
+$('#bFull').onclick = ()=>{
+  const el = $('#app');
+  if (!document.fullscreenElement){ (el.requestFullscreen||el.webkitRequestFullscreen||(()=>{})).call(el); }
+  else (document.exitFullscreen||document.webkitExitFullscreen||(()=>{})).call(document);
+};
+document.addEventListener('keydown',e=>{
+  if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if (e.key===' ' && !(e.target && e.target.tagName==='BUTTON')){ e.preventDefault(); if (state==='idle'||state==='ended') doStart(); else doPause(); }
+  else if (e.key==='Enter' && !(e.target && e.target.tagName==='BUTTON')) doStart();
+  else if (e.key==='Escape') doStop();
+  else if (/^[1-6]$/.test(e.key)) jump(+e.key-1);
+  else if (e.key==='r'||e.key==='R') doRestart();
+  else if (e.key==='m'||e.key==='M') $('#bSound').click();
+  else if (e.key==='f'||e.key==='F') $('#bFull').click();
+});
+document.addEventListener('visibilitychange',()=>{ if (document.hidden && state==='playing') doPause(); });
+window.addEventListener('pagehide',stopVoice);
+
+/* ---------- 16:9 맞춤 ---------- */
+function fit(){
+  const vp = $('#viewport'), w = vp.clientWidth, h = vp.clientHeight;
+  const s = Math.min(w/1920, h/1080);
+  $('#frame').style.width = (1920*s)+'px'; $('#frame').style.height = (1080*s)+'px';
+  $('#stage').style.transform = `scale(${s})`;
+}
+window.addEventListener('resize',fit); document.addEventListener('fullscreenchange',()=>setTimeout(fit,50));
+fit(); updateChip(); setUI(); render();
+
+/* 테스트/디버그용 훅 */
+window.__p4 = { seek:(sec)=>{ state='paused'; elapsed=clamp(sec,0,TOTAL-.001); curScene=-1; setUI(); veil.classList.add('hidden'); render(); }, get state(){return state;}, get elapsed(){return elapsed;} };
+</script>
+</body>
+</html>
