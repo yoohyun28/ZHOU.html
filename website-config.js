@@ -22,9 +22,9 @@ const WEBSITE_CONFIG = {
   // E-book 및 문서 링크 설정
   ebook: {
     // 온라인 플립북 서비스에서 발급받은 iframe embed URL (비어 있으면 플레이스홀더 표시)
-    embedUrl: "", 
+    embedUrl: "https://dianzishuyulan.netlify.app/", 
     // 온라인 플립북 새 창 보기 링크 (비어 있으면 안내 모달/로컬 링크 제공)
-    publicUrl: "", 
+    publicUrl: "https://dianzishuyulan.netlify.app/", 
     // 로컬 PDF 및 DOCX 상대 경로
     pdfPath: "./assets/reports/P4_final_report.pdf",
     docxPath: "./assets/reports/P4_final_report.docx"
